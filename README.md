@@ -14,3 +14,12 @@
     - create database by `create database test;`
     - add access rights to user by `GRANT ALL PRIVILEGES ON test.* TO test@localhost IDENTIFIED BY 'password';`
     - logout by `quit`
+- add traQ token by `export TRAQ_ACCESS_TOKEN=hogehogepunipuni`
+
+## development
+### create app
+- `python manage.py startapp polls`
+- add views to `view.py`
+
+## others
+- api: https://apis.trap.jp
