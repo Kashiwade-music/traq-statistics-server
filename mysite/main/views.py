@@ -25,7 +25,7 @@ def check_already_loaded_user_database():
                         displayName=user.display_name,
                         iconFileId=user.icon_file_id,
                         bot=user.bot,
-                        state=user.state,
+                        state=int(user.state),
                         updatedAt=user.updated_at,
                     )
             except traq.ApiException as e:
