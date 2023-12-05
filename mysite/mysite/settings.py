@@ -84,6 +84,9 @@ DATABASES = {
         "PASSWORD": os.environ.get("NS_MARIADB_PASSWORD", "password"),
         "PORT": os.environ.get("NS_MARIADB_PORT", "3306"),
         "USER": os.environ.get("NS_MARIADB_USER", "test"),
+        "OPTIONS": {
+            "charset": "utf8mb4",
+        },
     }
 }
 
