@@ -22,5 +22,9 @@
 - `python manage.py startapp polls`
 - add views to `view.py`
 
+### run devserver
+- `cd mysite`
+- `python manage.py runserver`
+
 ## others
 - api: https://apis.trap.jp
