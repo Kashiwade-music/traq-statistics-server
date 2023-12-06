@@ -1,11 +1,21 @@
+import time
 from main.modules.traq import traqApi
 import os
 from main.models import User, Message, Stamp
 import main.modules.traq as traq
+from rich.progress import track
+import datetime
 
+
+def convert_to_datetime(date_string):
+    date_format = "%Y-%m-%dT%H:%M:%S.%fZ"
+    datetime_object = datetime.datetime.strptime(date_string, date_format)
+    return datetime_object
 
 def __check_already_loaded_user_database():
-    if len(User.objects.all()) < 10:
+    print("Checking if user database is already loaded...")
+    print(f"Number of users in database: {len(User.objects.all())}")
+    if len(User.objects.all()) < 1:
         print("User database is empty. Loading...")
         User.objects.all().delete()
         traq = traqApi(os.environ["TRAQ_ACCESS_TOKEN"])
@@ -25,7 +35,10 @@ def __check_already_loaded_user_database():
 
 def get_userid_from_username(username):
     __check_already_loaded_user_database()
-    return User.objects.get(name=username).id
+    # print all users
+    print(username)
+    user = User.objects.get(name=username)
+    return user.id
 
 
 def search_messages_from_traq(
@@ -42,31 +55,45 @@ def search_messages_from_traq(
     hasImage: bool = None,
     hasVideo: bool = None,
     hasAudio: bool = None,
-    limit: int = None,
+    limit: int = 100,
     offset: int = None,
     sort: str = None,
 ) -> traq.MessageSearch:
     traq = traqApi(os.environ["TRAQ_ACCESS_TOKEN"])
-    messages = traq.search_messages(
-        word=word,
-        after=after,
-        before=before,
-        in_=in_,
-        to=to,
-        from_=from_,
-        citation=citation,
-        bot=bot,
-        hasURL=hasURL,
-        hasAttachment=hasAttachment,
-        hasImage=hasImage,
-        hasVideo=hasVideo,
-        hasAudio=hasAudio,
-        limit=limit,
-        offset=offset,
-        sort=sort,
-    )
-    # database update. if message is already in database, update it. if not, create it.
-    for message in messages["hits"]:
+    all_messages = []
+    total_hits = 0
+
+    while True:
+        messages = traq.search_messages(
+            word=word,
+            after=after,
+            before=before,
+            in_=in_,
+            to=to,
+            from_=from_,
+            citation=citation,
+            bot=bot,
+            hasURL=hasURL,
+            hasAttachment=hasAttachment,
+            hasImage=hasImage,
+            hasVideo=hasVideo,
+            hasAudio=hasAudio,
+            limit=limit,
+            offset=offset,
+            sort=sort,
+        )
+
+        all_messages.extend(messages["hits"])
+
+        if messages["totalHits"] == len(all_messages):
+            total_hits = messages["totalHits"]
+            break
+
+        offset = len(all_messages)
+        print(f"totalHits: {messages['totalHits']}, offset: {offset}")
+        time.sleep(0.5)
+
+    for message in track(all_messages, description="Saving messages to database..."):
         m, _ = Message.objects.update_or_create(
             id=message["id"],
             defaults={
@@ -78,11 +105,13 @@ def search_messages_from_traq(
                 "pinned": message["pinned"],
             },
         )
-        m.save()
-        if len(m.stamps.all()) != 0:
-            m.stamps.all().delete()
-        for stamp in message["stamps"]:
-            s = Stamp.objects.create(
+
+        # Delete existing stamps in one query instead of individually
+        m.stamps.all().delete()
+
+        # Create stamps in bulk
+        stamps = [
+            Stamp(
                 userId=stamp["userId"],
                 stampId=stamp["stampId"],
                 count=stamp["count"],
@@ -90,8 +119,26 @@ def search_messages_from_traq(
                 updatedAt=stamp["updatedAt"],
                 message=m,
             )
-            s.save()
-    return messages
+            for stamp in message["stamps"]
+        ]
+
+        Stamp.objects.bulk_create(stamps)
+
+    return {"totalHits": total_hits, "hits": all_messages}
+
+def get_all_messages_from_traq_and_save_to_db(after: str = None):
+    temp_after = after
+    temp_before = None
+    while True:
+        m = search_messages_from_traq(after=temp_after, before=temp_before)
+        if len(m["hits"]) == 0:
+            break
+        oldest_message = m["hits"][-1]
+        oldest_message_datetime = convert_to_datetime(oldest_message["createdAt"])
+        print(f"oldest_message_datetime: {oldest_message_datetime}")
+        if oldest_message_datetime < convert_to_datetime(after):
+            break
+        temp_before = oldest_message["createdAt"]
 
 
 def search_messages_from_db(
@@ -107,6 +154,7 @@ def search_messages_from_db(
     sort: str = None,
 ) -> traq.MessageSearch:
     messages = Message.objects.all()
+    print(len(messages))
     if word != None:
         messages = messages.filter(content__contains=word)
     if after != None:

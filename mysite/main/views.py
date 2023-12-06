@@ -14,8 +14,10 @@ def index(request):
 
 
 def users(request, username):
-    _ = utils.search_messages_from_traq(from_=utils.get_userid_from_username(username))
+    # _ = utils.search_messages_from_traq()
     ms = utils.search_messages_from_db(
-        word="は", from_=utils.get_userid_from_username(username)
+        from_=utils.get_userid_from_username(username), sort="asc"
     )
-    return HttpResponse(pprint.pformat(ms))
+    utils.get_all_messages_from_traq_and_save_to_db(after="2023-12-06T00:00:00.000Z")
+    print(len(ms["hits"]))
+    return HttpResponse([f"createdAt: {m['createdAt']}, userid: {m['userId']}, content: {m['content']}<br>" for m in ms["hits"]])

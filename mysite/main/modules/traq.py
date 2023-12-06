@@ -140,7 +140,6 @@ class traqApi:
                 "sort": sort,
             },
         )
-        print(res.json())
         return res.json()
 
 
