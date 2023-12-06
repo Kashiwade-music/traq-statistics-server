@@ -1,11 +1,8 @@
 from django.shortcuts import render
 from django.http import HttpResponse
-from main.modules.traq import traqApi
 import main.modules.utils as utils
-import os
-from main.models import User
+import main.modules.statistics as statistics
 from rich import print
-import pprint
 
 
 # Create your views here.
@@ -14,16 +11,10 @@ def index(request):
 
 
 def users(request, username):
-    utils.get_all_messages_from_traq_and_save_to_db(after="2023-12-06T00:00:00.000Z")
-    ms = utils.search_messages_from_db(
-        # from_=utils.get_userid_from_username(username),
-        sort="asc",
-        after="2023-12-06T00:00:00.000Z",
+    # utils.get_all_messages_from_traq_and_save_to_db(after="2023-01-01T00:00:00.000Z")
+    user_statistics = statistics.UserStatistics(username)
+    result = user_statistics.generate_post_frequency_by_time_and_day(
+        after="2023-01-02T00:00:00.000Z"
     )
-    print(len(ms["hits"]))
-    return HttpResponse(
-        [
-            f"createdAt: {m['createdAt']}, userid: {m['userId']}, content: {m['content']}<br>"
-            for m in ms["hits"]
-        ]
-    )
+    print(result)
+    return HttpResponse(f"Hello, {username}. You're at the polls index. {result}")

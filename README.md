@@ -30,5 +30,18 @@
 - `cd mysite`
 - `python manage.py runserver`
 
+## statistics
+### user
+- 指定期間(1日～全期間)の
+  - 時間・曜日別の投稿頻度
+  - 累計投稿数の推移
+  - メッセージランキング
+    - スタンプをつけた人数
+    - スタンプの種類別(1人1つとカウント)
+  - ワードマップ
+  - つけたスタンプの統計
+
+### word
+
 ## others
 - api: https://apis.trap.jp
