@@ -7,16 +7,59 @@ from rich.progress import track
 import datetime
 
 
-def convert_to_datetime(date_string):
+def convert_to_datetime(date_string: str) -> datetime.datetime:
+    """
+    Convert a date string to a datetime object.
+
+    Args:
+        date_string (str): The date string to be converted. Format: "%Y-%m-%dT%H:%M:%S.%fZ" e.g. "2023-12-06T00:00:00.000Z"
+
+    Returns:
+        datetime.datetime: The converted datetime object.
+    """
     date_format = "%Y-%m-%dT%H:%M:%S.%fZ"
     datetime_object = datetime.datetime.strptime(date_string, date_format)
     return datetime_object
 
+
+def convert_datatime_utc_to_jst(
+    datetime_object: datetime.datetime,
+) -> datetime.datetime:
+    """
+    Convert a datetime object from UTC to JST (Japan Standard Time).
+
+    Args:
+        datetime_object (datetime.datetime): The datetime object to be converted.
+
+    Returns:
+        datetime.datetime: The converted datetime object in JST.
+    """
+    datetime_object = datetime_object + datetime.timedelta(hours=9)
+    return datetime_object
+
+
+def convert_datatime_jst_to_utc(
+    datetime_object: datetime.datetime,
+) -> datetime.datetime:
+    """
+    Converts a datetime object from JST (Japan Standard Time) to UTC (Coordinated Universal Time).
+
+    Args:
+        datetime_object (datetime.datetime): The datetime object to be converted.
+
+    Returns:
+        datetime.datetime: The converted datetime object in UTC.
+    """
+    datetime_object = datetime_object - datetime.timedelta(hours=9)
+    return datetime_object
+
+
 def __check_already_loaded_user_database():
-    print("Checking if user database is already loaded...")
-    print(f"Number of users in database: {len(User.objects.all())}")
+    """
+    Check if the user database is already loaded.
+    If the database is empty, load the users from the traQ API and save them to the database.
+    """
     if len(User.objects.all()) < 1:
-        print("User database is empty. Loading...")
         User.objects.all().delete()
         traq = traqApi(os.environ["TRAQ_ACCESS_TOKEN"])
         users = traq.get_users()
@@ -33,12 +76,18 @@ def __check_already_loaded_user_database():
             u.save()
 
 
-def get_userid_from_username(username):
+def get_userid_from_username(username: str) -> str:
+    """
+    Get the user ID from the given username.
+
+    Args:
+        username (str): The username of the user. e.g. "kashiwade"
+
+    Returns:
+        str: The user ID corresponding to the given username.
+    """
     __check_already_loaded_user_database()
-    # print all users
-    print(username)
-    user = User.objects.get(name=username)
-    return user.id
+    return User.objects.get(name=username).id
 
 
 def search_messages_from_traq(
@@ -59,6 +108,30 @@ def search_messages_from_traq(
     offset: int = None,
     sort: str = None,
 ) -> traq.MessageSearch:
+    """
+    Search messages from traq based on various parameters.
+
+    Args:
+        word (str, optional): The word to search for in the messages. Defaults to None.
+        after (str, optional): The date and time after which the messages were created. Defaults to None. UTC. Format: "%Y-%m-%dT%H:%M:%S.%fZ" e.g. "2023-12-06T00:00:00.000Z"
+        before (str, optional): The date and time before which the messages were created. Defaults to None. UTC. Format: "%Y-%m-%dT%H:%M:%S.%fZ" e.g. "2023-12-06T00:00:00.000Z"
+        in_ (str, optional): The channel ID to search within. Defaults to None.
+        to (str, optional): The user ID to search for messages mention to. Defaults to None.
+        from_ (str, optional): The user ID to search for messages sent from. Defaults to None.
+        citation (str, optional): The message ID to search for messages that cite it. Defaults to None.
+        bot (bool, optional): Whether to search for messages sent by bots. Defaults to False.
+        hasURL (bool, optional): Whether to search for messages that have URLs. Defaults to None.
+        hasAttachment (bool, optional): Whether to search for messages that have attachments. Defaults to None.
+        hasImage (bool, optional): Whether to search for messages that have images. Defaults to None.
+        hasVideo (bool, optional): Whether to search for messages that have videos. Defaults to None.
+        hasAudio (bool, optional): Whether to search for messages that have audio files. Defaults to None.
+        limit (int, optional): The maximum number of messages to retrieve. Defaults to 100. Max: 100
+        offset (int, optional): The offset to start retrieving messages from. Defaults to None.
+        sort (str, optional): The sorting order of the messages. Defaults to None. createdAt, -createdAt, updatedAt, -updatedAt
+
+    Returns:
+        traq.MessageSearch: A dictionary containing the total number of hits and the list of messages.
+    """
     traq = traqApi(os.environ["TRAQ_ACCESS_TOKEN"])
     all_messages = []
     total_hits = 0
@@ -126,7 +199,17 @@ def search_messages_from_traq(
 
     return {"totalHits": total_hits, "hits": all_messages}
 
+
 def get_all_messages_from_traq_and_save_to_db(after: str = None):
+    """
+    Retrieve all messages from traQ and save them to the database.
+
+    Args:
+        after (str, optional): The timestamp to start retrieving messages from. Defaults to None. Format: "%Y-%m-%dT%H:%M:%S.%fZ" e.g. "2023-12-06T00:00:00.000Z"
+
+    Returns:
+        None
+    """
     temp_after = after
     temp_before = None
     while True:
@@ -153,6 +236,25 @@ def search_messages_from_db(
     offset: int = None,
     sort: str = None,
 ) -> traq.MessageSearch:
+    """
+    Search messages from the database based on the given criteria.
+
+    Args:
+        word (str, optional): The word to search for in the message content. Defaults to None.
+        after (str, optional): The minimum creation date of the messages to search for. Defaults to None. UTC. Format: "%Y-%m-%dT%H:%M:%S.%fZ" e.g. "2023-12-06T00:00:00.000Z"
+        before (str, optional): The maximum creation date of the messages to search for. Defaults to None. UTC. Format: "%Y-%m-%dT%H:%M:%S.%fZ" e.g. "2023-12-06T00:00:00.000Z"
+        in_ (str, optional): The channel ID to search within. Defaults to None.
+        to (str, optional): The user ID to search for messages mention to. Defaults to None.
+        from_ (str, optional): The user ID to search for messages sent from. Defaults to None.
+        citation (str, optional): The message ID to search for messages that cite it. Defaults to None.
+        limit (int, optional): The maximum number of messages to return. Defaults to None.
+        offset (int, optional): The number of messages to skip before returning results. Defaults to None.
+        sort (str, optional): The sorting order of the messages by createdAt. Can be "asc" for ascending or "desc" for descending. Defaults to None.
+
+    Returns:
+        traq.MessageSearch: An object containing the search results.
+
+    """
     messages = Message.objects.all()
     print(len(messages))
     if word != None:
