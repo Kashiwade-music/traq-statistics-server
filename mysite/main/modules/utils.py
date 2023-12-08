@@ -5,6 +5,7 @@ from main.models import User, Message, Stamp
 import main.modules.traq as traq
 from rich.progress import track
 import datetime
+from django.db.models import Q
 
 
 def convert_to_datetime(date_string: str) -> datetime.datetime:
@@ -235,6 +236,7 @@ def search_messages_from_db(
     limit: int = None,
     offset: int = None,
     sort: str = None,
+    need_count: bool = False,
 ) -> traq.MessageSearch:
     """
     Search messages from the database based on the given criteria.
@@ -250,39 +252,51 @@ def search_messages_from_db(
         limit (int, optional): The maximum number of messages to return. Defaults to None.
         offset (int, optional): The number of messages to skip before returning results. Defaults to None.
         sort (str, optional): The sorting order of the messages by createdAt. Can be "asc" for ascending or "desc" for descending. Defaults to None.
-
+        need_count (bool, optional): Whether to return the total number of hits. Defaults to False.
     Returns:
         traq.MessageSearch: An object containing the search results.
 
     """
-    messages = Message.objects.all()
-    print(len(messages))
+
+    query = Q()
     if word != None:
-        messages = messages.filter(content__contains=word)
+        query &= Q(content__contains=word)
     if after != None:
-        messages = messages.filter(createdAt__gte=after)
+        query &= Q(createdAt__gte=after)
     if before != None:
-        messages = messages.filter(createdAt__lte=before)
+        query &= Q(createdAt__lte=before)
     if in_ != None:
-        messages = messages.filter(channelId=in_)
+        query &= Q(channelId=in_)
     if to != None:
-        messages = messages.filter(content__contains=to)
+        query &= Q(content__contains=to)
     if from_ != None:
-        messages = messages.filter(userId=from_)
+        query &= Q(userId=from_)
     if citation != None:
-        messages = messages.filter(content__contains=citation)
-    if limit != None:
-        messages = messages[:limit]
-    if offset != None:
-        messages = messages[offset:]
+        query &= Q(content__contains=citation)
+
+    start = time.time()
+    messages = Message.objects.filter(query)
+    print(f"query time: {time.time() - start}")
+
     if sort != None:
         if sort == "asc":
             messages = messages.order_by("createdAt")
         elif sort == "desc":
             messages = messages.order_by("-createdAt")
 
+    start = time.time()
+    total_hits = messages.count() if need_count else None
+    print(f"count time: {time.time() - start}")
+
+    if offset != None:
+        messages = messages[offset:]
+
+    if limit != None:
+        messages = messages[:limit]
+
+    start = time.time()
     return_dict = {
-        "totalHits": len(messages),
+        "totalHits": total_hits,
         "hits": [
             {
                 "id": message.id,
@@ -303,7 +317,8 @@ def search_messages_from_db(
                     for stamp in message.stamps.all()
                 ],
             }
-            for message in messages
+            for message in messages.prefetch_related("stamps")
         ],
     }
+    print(f"convert time: {time.time() - start}")
     return return_dict
