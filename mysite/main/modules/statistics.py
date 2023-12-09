@@ -53,6 +53,7 @@ class UserStatistics:
             "username": self.username,
             "userid": self.userid,
             "lastUpdate": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "lastMessageCreatedAt": self.messageSearchResult["hits"][-1]["createdAt"],
             "message_count": message_num,
             "word_ranking": word_ranking,
             "word_len": word_len,
