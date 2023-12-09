@@ -242,6 +242,63 @@ def get_all_messages_from_traq_and_save_to_db(after: str = None):
         temp_before = oldest_message["createdAt"]
 
 
+def search_stamps_from_db(
+    userId: str = None,
+    stampId: str = None,
+    count: int = None,
+    after: str = None,
+    before: str = None,
+    sort: str = None,
+) -> list[traq.Stamp]:
+    """
+    Search stamps from the database based on the given criteria.
+
+    Args:
+        userId (str, optional): The user ID to search for. Defaults to None.
+        stampId (str, optional): The stamp ID to search for. Defaults to None.
+        count (int, optional): The number of stamps to search for. Defaults to None.
+        after (str, optional): The minimum creation date of the stamps to search for. Defaults to None. UTC. Format: "%Y-%m-%dT%H:%M:%S.%fZ" e.g. "2023-12-06T00:00:00.000Z"
+        before (str, optional): The maximum creation date of the stamps to search for. Defaults to None. UTC. Format: "%Y-%m-%dT%H:%M:%S.%fZ" e.g. "2023-12-06T00:00:00.000Z"
+        sort (str, optional): The sorting order of the stamps by createdAt. Can be "asc" for ascending or "desc" for descending. Defaults to None.
+
+    Returns:
+        list[traq.Stamp]: A list of Stamp objects representing the stamps.
+    """
+    query = Q()
+    if userId != None:
+        query &= Q(userId=userId)
+    if stampId != None:
+        query &= Q(stampId=stampId)
+    if count != None:
+        query &= Q(count=count)
+    if after != None:
+        query &= Q(createdAt__gte=after)
+    if before != None:
+        query &= Q(createdAt__lte=before)
+
+    if sort != None:
+        if sort == "asc":
+            stamps = Stamp.objects.filter(query).order_by("createdAt")
+        elif sort == "desc":
+            stamps = Stamp.objects.filter(query).order_by("-createdAt")
+    else:
+        stamps = Stamp.objects.filter(query)
+
+    return_list = []
+    for stamp in stamps:
+        return_list.append(
+            {
+                "userId": stamp.userId,
+                "stampId": stamp.stampId,
+                "count": stamp.count,
+                "createdAt": stamp.createdAt,
+                "updatedAt": stamp.updatedAt,
+            }
+        )
+
+    return return_list
+
+
 def search_messages_from_db(
     word: str = None,
     after: str = None,
@@ -312,53 +369,31 @@ def search_messages_from_db(
         messages = messages[:limit]
 
     start = time.time()
-    # return_dict = {
-    #     "totalHits": total_hits,
-    #     "hits": [
-    #         {
-    #             "id": message.id,
-    #             "userId": message.userId,
-    #             "channelId": message.channelId,
-    #             "content": message.content,
-    #             "createdAt": message.createdAt,
-    #             "updatedAt": message.updatedAt,
-    #             "pinned": message.pinned,
-    #             "stamps": [
-    #                 {
-    #                     "userId": stamp.userId,
-    #                     "stampId": stamp.stampId,
-    #                     "count": stamp.count,
-    #                     "createdAt": stamp.createdAt,
-    #                     "updatedAt": stamp.updatedAt,
-    #                 }
-    #                 for stamp in message.stamps.all()
-    #             ],
-    #         }
-    #         for message in messages.prefetch_related("stamps")
-    #     ],
-    # }
-    return_dict = {"totalHits": total_hits, "hits": []}
-    for message in messages.prefetch_related("stamps"):
-        message_dict = {
-            "id": message.id,
-            "userId": message.userId,
-            "channelId": message.channelId,
-            "content": message.content,
-            "createdAt": message.createdAt,
-            "updatedAt": message.updatedAt,
-            "pinned": message.pinned,
-            "stamps": [],
-        }
-        for stamp in message.stamps.all():
-            message_dict["stamps"].append(
-                {
-                    "userId": stamp.userId,
-                    "stampId": stamp.stampId,
-                    "count": stamp.count,
-                    "createdAt": stamp.createdAt,
-                    "updatedAt": stamp.updatedAt,
-                }
-            )
-        return_dict["hits"].append(message_dict)
+    return_dict = {
+        "totalHits": total_hits,
+        "hits": [
+            {
+                "id": message.id,
+                "userId": message.userId,
+                "channelId": message.channelId,
+                "content": message.content,
+                "createdAt": message.createdAt,
+                "updatedAt": message.updatedAt,
+                "pinned": message.pinned,
+                "stamps": [
+                    {
+                        "userId": stamp.userId,
+                        "stampId": stamp.stampId,
+                        "count": stamp.count,
+                        "createdAt": stamp.createdAt,
+                        "updatedAt": stamp.updatedAt,
+                    }
+                    for stamp in message.stamps.all()
+                ],
+            }
+            for message in messages.prefetch_related("stamps")
+        ],
+    }
+
     print(f"convert time: {time.time() - start}")
     return return_dict

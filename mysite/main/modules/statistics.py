@@ -24,6 +24,10 @@ class UserStatistics:
             )
         )
 
+        self.stamps_from_user = utils.search_stamps_from_db(
+            userId=self.userid, after=after, before=before, sort="asc"
+        )
+
     def __generate_message_dataframe_without_stamps(
         self, messageSearchResult: traq.MessageSearch
     ):
@@ -41,10 +45,36 @@ class UserStatistics:
 
     def make_statistics(self):
         return {
+            "favorite_stamp_ranking": self.generate_favorite_stamp_ranking(),
             "message_ranking_by_stamp_count": self.generate_message_ranking_by_stamp_count(),
             "post_count_transition": self.generate_post_count_transition(),
             "post_frequency_by_time_and_day": self.generate_post_frequency_by_time_and_day(),
         }
+
+    def generate_favorite_stamp_ranking(self):
+        result_list = []  # list[stampId, count]
+        for stamp in self.stamps_from_user:
+            stampId_index = next(
+                (
+                    i
+                    for i, item in enumerate(result_list)
+                    if item["stampId"] == stamp["stampId"]
+                ),
+                None,
+            )
+            if stampId_index is None:
+                result_list.append(
+                    {
+                        "stampId": stamp["stampId"],
+                        "count": 0,
+                    }
+                )
+                stampId_index = len(result_list) - 1
+            result_list[stampId_index]["count"] += 1
+
+        result_list.sort(key=lambda x: x["count"], reverse=True)
+        result_list = result_list[:20]
+        return result_list
 
     def generate_message_ranking_by_stamp_count(self):
         result_dict = {
