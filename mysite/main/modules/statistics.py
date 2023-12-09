@@ -7,6 +7,7 @@ import time
 import copy
 import MeCab
 import re
+import datetime
 
 
 class UserStatistics:
@@ -47,10 +48,15 @@ class UserStatistics:
 
     def make_statistics(self):
         word_ranking, word_len = self.generate_word_ranking()
+        message_num = len(self.messageSearchResult["hits"])
         return {
+            "username": self.username,
+            "userid": self.userid,
+            "lastUpdate": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "message_count": message_num,
             "word_ranking": word_ranking,
             "word_len": word_len,
-            "word_average": word_len / len(self.messageSearchResult["hits"]),
+            "word_average": word_len / message_num,
             "favorite_stamp_ranking": self.generate_favorite_stamp_ranking(),
             "message_ranking_by_stamp_count": self.generate_message_ranking_by_stamp_count(),
             "post_count_transition": self.generate_post_count_transition(),
