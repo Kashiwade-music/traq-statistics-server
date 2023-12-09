@@ -5,6 +5,7 @@
 - set up conda by `conda init zsh`
 - create conda env by `conda env create --file env.yaml`
 - activate conda env by `conda activate traq-statistics-server`
+- download unidic by `python -m unidic download`
 - start up mariadb by `sudo service mariadb start`
 - set up mariadb by `sudo mysql_secure_installation`
     - root password: `root`

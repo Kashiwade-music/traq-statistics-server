@@ -1,10 +1,12 @@
-from collections import defaultdict
+from collections import defaultdict, Counter
 import main.modules.utils as utils
 import main.modules.traq as traq
 import pandas as pd
 from rich import print
 import time
 import copy
+import MeCab
+import re
 
 
 class UserStatistics:
@@ -44,12 +46,78 @@ class UserStatistics:
         return messageDataFrame
 
     def make_statistics(self):
+        word_ranking, word_len = self.generate_word_ranking()
         return {
+            "word_ranking": word_ranking,
+            "word_len": word_len,
+            "word_average": word_len / len(self.messageSearchResult["hits"]),
             "favorite_stamp_ranking": self.generate_favorite_stamp_ranking(),
             "message_ranking_by_stamp_count": self.generate_message_ranking_by_stamp_count(),
             "post_count_transition": self.generate_post_count_transition(),
             "post_frequency_by_time_and_day": self.generate_post_frequency_by_time_and_day(),
         }
+
+    def generate_word_ranking(self):
+        text = ""
+        for _, row in self.messageDataFrame_without_stamps.iterrows():
+            _t = row["content"]
+            # delete stamp
+            _t = re.sub(r"\[:(.*?):\]", "", _t)
+            # delete url
+            _t = re.sub(r"https?://[\w/:%#\$&\?\(\)~\.=\+\-]+", "", _t)
+            # delete mention like !{~~~}
+            _t = re.sub(r"!{.*?}", "", _t)
+
+            text += _t + "\n"
+        text = text.replace("\n", " ")
+        text = text.replace("　", " ")
+
+        mecab = MeCab.Tagger()
+        node = mecab.parseToNode(text)
+        NG_WORD_LIST = [
+            "今日",
+            "やつ",
+            "ほう",
+            "せい",
+            "こと",
+            "よう",
+            "そう",
+            "これ",
+            "それ",
+            "あれ",
+            "の",
+            "もの",
+            "とき",
+            "ため",
+            "ところ",
+            "とこ",
+            "ところ",
+            "気",
+            "人",
+            "null",
+            "ex",
+            "large",
+            "small",
+            "alert",
+            "方",
+            "あと",
+            "感じ",
+            "わけ",
+        ]
+        # 0~100までの数字
+        NG_WORD_LIST += [str(i) for i in range(101)]
+        words = []
+        while node:
+            if node.feature.split(",")[0] == "名詞":
+                if node.surface not in NG_WORD_LIST:
+                    if len(node.surface) > 1:
+                        words.append(node.surface)
+            node = node.next
+
+        word_count = Counter(words)
+
+        word_ranking = word_count.most_common(100)
+        return word_ranking, len(text)
 
     def generate_favorite_stamp_ranking(self):
         result_list = []  # list[stampId, count]
@@ -190,7 +258,6 @@ class UserStatistics:
         return result_dict
 
     def generate_post_count_transition(self):
-        print(self.messageDataFrame_without_stamps["createdAt"].dt.date)
         result_dict = {
             "cumulative": pd.Series(
                 self.messageDataFrame_without_stamps["createdAt"].dt.date.value_counts()
