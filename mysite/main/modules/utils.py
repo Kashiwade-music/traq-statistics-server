@@ -6,6 +6,7 @@ import main.modules.traq as traq
 from rich.progress import track
 import datetime
 from django.db.models import Q
+from rich import print
 
 
 def convert_to_datetime(date_string: str) -> datetime.datetime:
@@ -184,19 +185,35 @@ def search_messages_from_traq(
         m.stamps.all().delete()
 
         # Create stamps in bulk
-        stamps = [
-            Stamp(
-                userId=stamp["userId"],
-                stampId=stamp["stampId"],
-                count=stamp["count"],
-                createdAt=stamp["createdAt"],
-                updatedAt=stamp["updatedAt"],
-                message=m,
+        # stamps = [
+        #     Stamp(
+        #         userId=stamp["userId"],
+        #         stampId=stamp["stampId"],
+        #         count=stamp["count"],
+        #         createdAt=stamp["createdAt"],
+        #         updatedAt=stamp["updatedAt"],
+        #         message=m,
+        #     )
+        #     for stamp in message["stamps"]
+        # ]
+
+        stamps = []
+        print(f"stamp count: {len(message['stamps'])}")
+        for stamp in message["stamps"]:
+            stamps.append(
+                Stamp(
+                    userId=stamp["userId"],
+                    stampId=stamp["stampId"],
+                    count=stamp["count"],
+                    createdAt=stamp["createdAt"],
+                    updatedAt=stamp["updatedAt"],
+                    message=m,
+                )
             )
-            for stamp in message["stamps"]
-        ]
 
         Stamp.objects.bulk_create(stamps)
+        print(f"message: {m.content} saved to database")
+        print(f"stamps: {m.stamps.count()} saved to database")
 
     return {"totalHits": total_hits, "hits": all_messages}
 
@@ -295,30 +312,53 @@ def search_messages_from_db(
         messages = messages[:limit]
 
     start = time.time()
-    return_dict = {
-        "totalHits": total_hits,
-        "hits": [
-            {
-                "id": message.id,
-                "userId": message.userId,
-                "channelId": message.channelId,
-                "content": message.content,
-                "createdAt": message.createdAt,
-                "updatedAt": message.updatedAt,
-                "pinned": message.pinned,
-                "stamps": [
-                    {
-                        "userId": stamp.userId,
-                        "stampId": stamp.stampId,
-                        "count": stamp.count,
-                        "createdAt": stamp.createdAt,
-                        "updatedAt": stamp.updatedAt,
-                    }
-                    for stamp in message.stamps.all()
-                ],
-            }
-            for message in messages.prefetch_related("stamps")
-        ],
-    }
+    # return_dict = {
+    #     "totalHits": total_hits,
+    #     "hits": [
+    #         {
+    #             "id": message.id,
+    #             "userId": message.userId,
+    #             "channelId": message.channelId,
+    #             "content": message.content,
+    #             "createdAt": message.createdAt,
+    #             "updatedAt": message.updatedAt,
+    #             "pinned": message.pinned,
+    #             "stamps": [
+    #                 {
+    #                     "userId": stamp.userId,
+    #                     "stampId": stamp.stampId,
+    #                     "count": stamp.count,
+    #                     "createdAt": stamp.createdAt,
+    #                     "updatedAt": stamp.updatedAt,
+    #                 }
+    #                 for stamp in message.stamps.all()
+    #             ],
+    #         }
+    #         for message in messages.prefetch_related("stamps")
+    #     ],
+    # }
+    return_dict = {"totalHits": total_hits, "hits": []}
+    for message in messages.prefetch_related("stamps"):
+        message_dict = {
+            "id": message.id,
+            "userId": message.userId,
+            "channelId": message.channelId,
+            "content": message.content,
+            "createdAt": message.createdAt,
+            "updatedAt": message.updatedAt,
+            "pinned": message.pinned,
+            "stamps": [],
+        }
+        for stamp in message.stamps.all():
+            message_dict["stamps"].append(
+                {
+                    "userId": stamp.userId,
+                    "stampId": stamp.stampId,
+                    "count": stamp.count,
+                    "createdAt": stamp.createdAt,
+                    "updatedAt": stamp.updatedAt,
+                }
+            )
+        return_dict["hits"].append(message_dict)
     print(f"convert time: {time.time() - start}")
     return return_dict
